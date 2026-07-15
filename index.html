@@ -147,12 +147,32 @@ let currentMultiplier = 1;
 let rainInterval = null;
 
 // ==================== ヘルパー ====================
+// ==================== 数値フォーマット ====================
 function formatNumber(num) {
-  if (num < 1000) return num < 10 ? num.toFixed(2) : Math.floor(num).toString();
-  const suffixes = ['K','M','B','T','Qa','Qi','Sx','Sp','Oc','No','Dc'];
-  let tier = 0, n = num;
-  while (n >= 1000 && tier < suffixes.length-1) { n /= 1000; tier++; }
-  return n.toFixed(2) + suffixes[tier];
+  if (!isFinite(num) || num <= 0) return '0';
+  
+  num = Math.floor(num); // 小数点以下切り捨て
+  
+  if (num < 10000) {
+    return num.toLocaleString('ja-JP');           // 1,234 のように表示
+  }
+  
+  if (num < 1000000) {
+    return (num / 1000).toFixed(1) + 'K';        // 12.3K
+  }
+  if (num < 1000000000) {
+    return (num / 1000000).toFixed(2) + 'M';     // 1.23M
+  }
+  
+  // それ以上は B 以降
+  const suffixes = ['B', 'T', 'Qa', 'Qi', 'Sx', 'Sp', 'Oc', 'No', 'Dc'];
+  let tier = 2; // Bから
+  let n = num / 1000000000;
+  while (n >= 1000 && tier < suffixes.length + 1) {
+    n /= 1000;
+    tier++;
+  }
+  return n.toFixed(2) + suffixes[tier - 2];
 }
 
 function getTotalProduction() {
