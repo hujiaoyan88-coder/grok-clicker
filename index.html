@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Grok Clicker 🌌</title>
 <style>
-  body { margin:0; padding:0; background: radial-gradient(circle at center, #0f1a3d 0%, #000011 100%); color:#cceeff; font-family:system-ui,sans-serif; min-height:100vh; }
+  body { margin:0; padding:0; background: radial-gradient(circle at center, #0f1a3d 0%, #000011 100%); color:#cceeff; font-family:system-ui,sans-serif; min-height:100vh; overflow-x:hidden; }
   .container { max-width:620px; margin:0 auto; padding:15px; }
   h1 { text-align:center; font-size:2.3rem; margin:10px 0; text-shadow:0 0 20px #66aaff; }
   .subtitle { text-align:center; color:#88bbff; margin-bottom:15px; }
@@ -41,10 +41,19 @@
     border-radius:9999px; font-size:1.1rem; font-weight:bold; cursor:pointer;
   }
   .buy-btn:hover:not(:disabled) { background:#3388ee; }
-  .buy-btn:disabled { background:#334466; cursor:not-allowed; }
 
-  .floating-text { position:absolute; color:#aaffff; font-weight:bold; pointer-events:none; text-shadow:0 0 8px #66aaff; animation:floatUp 0.9s ease-out forwards; }
+  .floating-text { position:absolute; color:#aaffff; font-weight:bold; pointer-events:none; text-shadow:0 0 10px #66aaff; animation:floatUp 0.9s ease-out forwards; }
   @keyframes floatUp { to { transform:translateY(-90px); opacity:0; } }
+
+  /* 降る星エフェクト */
+  .star-particle {
+    position: fixed; font-size: 1.5rem; pointer-events: none; z-index: 9999;
+    animation: fall linear forwards;
+    text-shadow: 0 0 12px #88eeff;
+  }
+  @keyframes fall {
+    to { transform: translateY(120vh) rotate(360deg); opacity: 0; }
+  }
 </style>
 </head>
 <body>
@@ -105,29 +114,24 @@
 
   <div style="text-align:center; margin:25px 0;">
     <button onclick="resetGame()" style="background:#cc3344; color:white; border:none; padding:10px 20px; border-radius:8px; cursor:pointer;">
-      🔄 進捗をリセット（最初からやり直す）
+      🔄 リセット
     </button>
   </div>
 </div>
 
 <script>
 // ==================== データ ====================
-let game = {
-  stars: 0,
-  lastSaved: Date.now(),
-  buildings: {
-    planet:    { owned: 0, baseCost: 15,   costMult: 1.15, baseProd: 0.2 },
-    star:      { owned: 0, baseCost: 120,  costMult: 1.15, baseProd: 1.5 },
-    galaxy:    { owned: 0, baseCost: 1200, costMult: 1.15, baseProd: 12 },
-    blackhole: { owned: 0, baseCost: 10000,costMult: 1.15, baseProd: 80 }
-  },
-  clickPower: 1
-};
+let game = { stars: 0, lastSaved: Date.now(), buildings: {
+  planet:    { owned: 0, baseCost: 15,   costMult: 1.15, baseProd: 0.2 },
+  star:      { owned: 0, baseCost: 120,  costMult: 1.15, baseProd: 1.5 },
+  galaxy:    { owned: 0, baseCost: 1200, costMult: 1.15, baseProd: 12 },
+  blackhole: { owned: 0, baseCost: 10000,costMult: 1.15, baseProd: 80 }
+}, clickPower: 1 };
 
 let lastUpdate = Date.now();
 let currentMultiplier = 1;
 
-// ==================== ヘルパー ====================
+// ==================== フォーマット ====================
 function formatNumber(num) {
   if (num < 1000) return num < 10 ? num.toFixed(2) : Math.floor(num).toString();
   const suffixes = ['K','M','B','T','Qa','Qi','Sx','Sp','Oc','No','Dc'];
@@ -144,12 +148,8 @@ function getTotalProduction() {
 
 function getCost(id, count = 1) {
   const b = game.buildings[id];
-  let total = 0;
-  let cur = b.baseCost * Math.pow(b.costMult, b.owned);
-  for (let i = 0; i < count; i++) {
-    total += Math.floor(cur);
-    cur *= b.costMult;
-  }
+  let total = 0, cur = b.baseCost * Math.pow(b.costMult, b.owned);
+  for (let i = 0; i < count; i++) { total += Math.floor(cur); cur *= b.costMult; }
   return Math.floor(total);
 }
 
@@ -162,8 +162,9 @@ function updateDisplay() {
     const id = el.dataset.id;
     const b = game.buildings[id];
     if (!b) return;
+    const count = currentMultiplier === 'max' ? 1 : currentMultiplier; // MAXは簡易表示
+    el.querySelector('.cost').textContent = formatNumber(getCost(id, count));
     el.querySelector('.owned').textContent = b.owned;
-    el.querySelector('.cost').textContent = formatNumber(getCost(id, 1));
   });
 }
 
@@ -172,38 +173,57 @@ function clickCosmos(e) {
   game.stars += game.clickPower;
   updateDisplay();
   saveGame();
+  createFloating(e, '+' + game.clickPower);
+}
 
+// ==================== 浮かぶ数字 ====================
+function createFloating(e, text) {
   const rect = e.currentTarget.getBoundingClientRect();
   const x = e.clientX - rect.left;
   const y = e.clientY - rect.top;
-  const text = document.createElement('div');
-  text.className = 'floating-text';
-  text.textContent = '+' + game.clickPower;
-  text.style.left = x + 'px';
-  text.style.top = y + 'px';
-  e.currentTarget.appendChild(text);
-  setTimeout(() => text.remove(), 900);
+  const div = document.createElement('div');
+  div.className = 'floating-text';
+  div.textContent = text;
+  div.style.left = x + 'px'; div.style.top = y + 'px';
+  e.currentTarget.appendChild(div);
+  setTimeout(() => div.remove(), 900);
+}
+
+// ==================== 降る星エフェクト ====================
+function createFallingStars(count, color = '#88eeff', size = '1.6rem') {
+  for (let i = 0; i < count; i++) {
+    setTimeout(() => {
+      const star = document.createElement('div');
+      star.className = 'star-particle';
+      star.textContent = '✨';
+      star.style.left = Math.random() * 100 + 'vw';
+      star.style.top = '-50px';
+      star.style.fontSize = size;
+      star.style.color = color;
+      star.style.animationDuration = (2 + Math.random() * 3) + 's';
+      document.body.appendChild(star);
+      setTimeout(() => star.remove(), 6000);
+    }, i * 15);
+  }
 }
 
 // ==================== 倍率 ====================
 function setMultiplier(multi) {
   currentMultiplier = multi;
   document.querySelectorAll('.multi-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.multi == multi));
+  updateDisplay(); // コスト更新
 }
 
-// ==================== 購入（ここを強化） ====================
+// ==================== 購入 ====================
 function buyBuilding(id) {
-  const b = game.buildings[id];
-  let count = currentMultiplier === 'max' ? 999999 : currentMultiplier; // MAXは後で計算
+  const wasOwned = game.buildings[id].owned;
+  let count = currentMultiplier === 'max' ? 999999 : currentMultiplier;
 
   if (currentMultiplier === 'max') {
-    let maxBuy = 0;
-    let temp = game.stars;
-    let curCost = b.baseCost * Math.pow(b.costMult, b.owned);
-    while (temp >= Math.floor(curCost) && maxBuy < 10000) {
-      temp -= Math.floor(curCost);
-      curCost *= b.costMult;
-      maxBuy++;
+    let maxBuy = 0; let temp = game.stars;
+    let curCost = game.buildings[id].baseCost * Math.pow(game.buildings[id].costMult, wasOwned);
+    while (temp >= Math.floor(curCost)) {
+      temp -= Math.floor(curCost); curCost *= game.buildings[id].costMult; maxBuy++;
     }
     count = maxBuy || 1;
   }
@@ -211,26 +231,31 @@ function buyBuilding(id) {
   const totalCost = getCost(id, count);
   if (game.stars >= totalCost && count > 0) {
     game.stars -= totalCost;
-    b.owned += count;
-    updateDisplay();
-    saveGame();
-  } else if (getCost(id, 1) <= game.stars) {
-    // 1個だけでも買える場合は強制的に1個買う
-    buyBuildingSingle(id);
-  }
-}
+    game.buildings[id].owned += count;
 
-function buyBuildingSingle(id) { // 単品用バックアップ
-  const cost = getCost(id, 1);
-  if (game.stars >= cost) {
-    game.stars -= cost;
-    game.buildings[id].owned++;
+    // 初回購入エフェクト
+    if (wasOwned === 0 && game.buildings[id].owned > 0) {
+      triggerFirstPurchaseEffect(id);
+    }
+
     updateDisplay();
     saveGame();
   }
 }
 
-// ==================== ゲームループ ====================
+function triggerFirstPurchaseEffect(id) {
+  if (id === 'planet') {
+    createFallingStars(25, '#88eeff', '1.4rem'); // 水色ネオン
+  } else if (id === 'star') {
+    createFallingStars(50, '#ffee88');
+  } else if (id === 'galaxy') {
+    createFallingStars(80, '#bb99ff');
+  } else if (id === 'blackhole') {
+    createFallingStars(120, '#ff88cc', '2rem');
+  }
+}
+
+// ==================== ループ・保存 ====================
 function gameLoop() {
   const now = Date.now();
   game.stars += getTotalProduction() * (now - lastUpdate) / 1000;
@@ -240,30 +265,26 @@ function gameLoop() {
   requestAnimationFrame(gameLoop);
 }
 
-// ==================== 保存 ====================
 function saveGame() {
   game.lastSaved = Date.now();
-  localStorage.setItem('grokClicker_v2', JSON.stringify(game)); // v2で別保存
+  localStorage.setItem('grokClicker_v3', JSON.stringify(game));
 }
 
 function loadGame() {
-  let saved = localStorage.getItem('grokClicker_v2');
-  if (!saved) saved = localStorage.getItem('grokClicker'); // 旧データも読み込み
+  const saved = localStorage.getItem('grokClicker_v3') || localStorage.getItem('grokClicker_v2');
   if (saved) {
     const data = JSON.parse(saved);
     game.stars = data.stars || 0;
     if (data.buildings) Object.assign(game.buildings, data.buildings);
-    const offlineSec = (Date.now() - (data.lastSaved || Date.now())) / 1000;
-    if (offlineSec > 5) game.stars += getTotalProduction() * offlineSec;
+    const offline = (Date.now() - (data.lastSaved || Date.now())) / 1000;
+    if (offline > 5) game.stars += getTotalProduction() * offline;
   }
   lastUpdate = Date.now();
-  updateDisplay();
 }
 
 function resetGame() {
-  if (confirm('本当に全部リセットしますか？')) {
-    localStorage.removeItem('grokClicker_v2');
-    localStorage.removeItem('grokClicker');
+  if (confirm('全部リセットしますか？')) {
+    localStorage.removeItem('grokClicker_v3');
     location.reload();
   }
 }
