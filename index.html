@@ -54,11 +54,10 @@
   }
   @keyframes floatUp { to { transform:translateY(-90px); opacity:0; } }
 
-  /* 常時降る星 */
   .star-particle {
     position: fixed; font-size: 1.4rem; pointer-events: none; z-index: 5;
     animation: fall linear forwards; text-shadow: 0 0 8px #88eeff;
-    opacity: 0.7;
+    opacity: 0.6;
   }
   @keyframes fall {
     to { transform: translateY(120vh) rotate(720deg); opacity: 0; }
@@ -130,15 +129,22 @@
 
 <script>
 // ==================== データ ====================
-let game = { stars: 0, lastSaved: Date.now(), buildings: {
-  planet:    { owned: 0, baseCost: 15,   costMult: 1.15, baseProd: 0.2 },
-  star:      { owned: 0, baseCost: 120,  costMult: 1.15, baseProd: 1.5 },
-  galaxy:    { owned: 0, baseCost: 1200, costMult: 1.15, baseProd: 12 },
-  blackhole: { owned: 0, baseCost: 10000,costMult: 1.15, baseProd: 80 }
-}, clickPower: 1 };
+let game = { 
+  stars: 0, 
+  lastSaved: Date.now(), 
+  buildings: {
+    planet:    { owned: 0, baseCost: 15,   costMult: 1.15, baseProd: 0.2 },
+    star:      { owned: 0, baseCost: 120,  costMult: 1.15, baseProd: 1.5 },
+    galaxy:    { owned: 0, baseCost: 1200, costMult: 1.15, baseProd: 12 },
+    blackhole: { owned: 0, baseCost: 10000,costMult: 1.15, baseProd: 80 }
+  }, 
+  clickPower: 1,
+  starRainLevel: 1  // 星の雨の強さ（初回購入で増加）
+};
 
 let lastUpdate = Date.now();
 let currentMultiplier = 1;
+let rainInterval = null;
 
 // ==================== ヘルパー ====================
 function formatNumber(num) {
@@ -157,8 +163,12 @@ function getTotalProduction() {
 
 function getCost(id, count = 1) {
   const b = game.buildings[id];
-  let total = 0, cur = b.baseCost * Math.pow(b.costMult, b.owned);
-  for (let i = 0; i < count; i++) { total += Math.floor(cur); cur *= b.costMult; }
+  let total = 0;
+  let cur = b.baseCost * Math.pow(b.costMult, b.owned);
+  for (let i = 0; i < count; i++) {
+    total += Math.floor(cur);
+    cur *= b.costMult;
+  }
   return Math.floor(total);
 }
 
@@ -171,7 +181,7 @@ function updateDisplay() {
     const id = el.dataset.id;
     const b = game.buildings[id];
     if (!b) return;
-    const count = currentMultiplier === 'max' ? 1 : currentMultiplier;
+    const count = (currentMultiplier === 'max') ? 1 : currentMultiplier;
     el.querySelector('.cost').textContent = formatNumber(getCost(id, count));
     el.querySelector('.owned').textContent = b.owned;
   });
@@ -198,31 +208,40 @@ function createFloating(e, text) {
 }
 
 // ==================== 星の雨 ====================
-function createFallingStar() {
+function createFallingStar(intensity = 1) {
   const star = document.createElement('div');
   star.className = 'star-particle';
   star.textContent = '☆';
   star.style.left = Math.random() * 100 + 'vw';
   star.style.top = '-30px';
-  star.style.animationDuration = (3 + Math.random() * 4) + 's';
-  star.style.opacity = 0.4 + Math.random() * 0.6;
+  star.style.animationDuration = (2.5 + Math.random() * 3.5) + 's';
+  star.style.opacity = 0.5 + Math.random() * 0.5;
+  star.style.fontSize = (1.2 + Math.random() * 0.6) + 'rem';
   document.body.appendChild(star);
   setTimeout(() => star.remove(), 8000);
 }
 
-// 常時優しい雨（1秒に1〜2個）
-setInterval(() => {
-  createFallingStar();
-  if (Math.random() > 0.5) createFallingStar();
-}, 800);
+function startStarRain() {
+  if (rainInterval) clearInterval(rainInterval);
+  const intervalTime = Math.max(300, 1200 - game.starRainLevel * 150); // レベル上がるほど速く
+  rainInterval = setInterval(() => {
+    const num = 1 + Math.floor(game.starRainLevel / 2);
+    for (let i = 0; i < num; i++) {
+      createFallingStar();
+    }
+  }, intervalTime);
+}
 
-// ==================== 初回購入大爆発 ====================
+// ==================== 初回購入エフェクト ====================
 function triggerFirstPurchaseEffect(id) {
-  let count = 40, color = '#88eeff', size = '1.6rem';
-  if (id === 'planet') { count = 35; color = '#88eeff'; }
-  else if (id === 'star') { count = 70; color = '#ffee88'; }
-  else if (id === 'galaxy') { count = 110; color = '#bb99ff'; }
-  else if (id === 'blackhole') { count = 160; color = '#ff88cc'; size = '2.2rem'; }
+  game.starRainLevel = Math.min(8, game.starRainLevel + 1); // 最大8段階
+  startStarRain();
+
+  let count = 40, color = '#88eeff';
+  if (id === 'planet') count = 35;
+  else if (id === 'star') count = 70;
+  else if (id === 'galaxy') count = 110;
+  else if (id === 'blackhole') { count = 160; color = '#ff88cc'; }
 
   for (let i = 0; i < count; i++) {
     setTimeout(() => {
@@ -231,12 +250,12 @@ function triggerFirstPurchaseEffect(id) {
       star.textContent = '☆';
       star.style.left = Math.random() * 100 + 'vw';
       star.style.top = '-50px';
-      star.style.fontSize = size;
+      star.style.fontSize = (id === 'blackhole' ? '2.2rem' : '1.6rem');
       star.style.color = color;
-      star.style.animationDuration = (1.5 + Math.random() * 2.5) + 's';
+      star.style.animationDuration = (1.2 + Math.random() * 2) + 's';
       document.body.appendChild(star);
       setTimeout(() => star.remove(), 7000);
-    }, i * 8);
+    }, i * 6);
   }
 }
 
@@ -248,8 +267,10 @@ function buyBuilding(id) {
   if (currentMultiplier === 'max') {
     let maxBuy = 0; let temp = game.stars;
     let curCost = game.buildings[id].baseCost * Math.pow(game.buildings[id].costMult, wasOwned);
-    while (temp >= Math.floor(curCost)) {
-      temp -= Math.floor(curCost); curCost *= game.buildings[id].costMult; maxBuy++;
+    while (temp >= Math.floor(curCost) && maxBuy < 10000) {
+      temp -= Math.floor(curCost);
+      curCost *= game.buildings[id].costMult;
+      maxBuy++;
     }
     count = maxBuy || 1;
   }
@@ -268,6 +289,13 @@ function buyBuilding(id) {
   }
 }
 
+// ==================== 倍率 ====================
+function setMultiplier(multi) {
+  currentMultiplier = multi;
+  document.querySelectorAll('.multi-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.multi == multi));
+  updateDisplay();
+}
+
 // ==================== ループ・保存 ====================
 function gameLoop() {
   const now = Date.now();
@@ -280,24 +308,26 @@ function gameLoop() {
 
 function saveGame() {
   game.lastSaved = Date.now();
-  localStorage.setItem('grokClicker_v3', JSON.stringify(game));
+  localStorage.setItem('grokClicker_v4', JSON.stringify(game));
 }
 
 function loadGame() {
-  const saved = localStorage.getItem('grokClicker_v3') || localStorage.getItem('grokClicker_v2');
+  const saved = localStorage.getItem('grokClicker_v4');
   if (saved) {
     const data = JSON.parse(saved);
     game.stars = data.stars || 0;
+    game.starRainLevel = data.starRainLevel || 1;
     if (data.buildings) Object.assign(game.buildings, data.buildings);
     const offline = (Date.now() - (data.lastSaved || Date.now())) / 1000;
     if (offline > 5) game.stars += getTotalProduction() * offline;
   }
   lastUpdate = Date.now();
+  startStarRain();
 }
 
 function resetGame() {
   if (confirm('全部リセットしますか？')) {
-    localStorage.removeItem('grokClicker_v3');
+    localStorage.removeItem('grokClicker_v4');
     location.reload();
   }
 }
