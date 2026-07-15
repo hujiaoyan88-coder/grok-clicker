@@ -5,8 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Grok Clicker 🌌</title>
 <style>
-  body { margin:0; padding:0; background: radial-gradient(circle at center, #0f1a3d 0%, #000011 100%); color:#cceeff; font-family:system-ui,sans-serif; min-height:100vh; overflow-x:hidden; }
-  .container { max-width:620px; margin:0 auto; padding:15px; }
+  body { 
+    margin:0; padding:0; 
+    background: radial-gradient(circle at center, #0f1a3d 0%, #000011 100%); 
+    color:#cceeff; font-family:system-ui,sans-serif; 
+    min-height:100vh; overflow-x:hidden; 
+  }
+  .container { max-width:620px; margin:0 auto; padding:15px; position:relative; z-index:10; }
+
   h1 { text-align:center; font-size:2.3rem; margin:10px 0; text-shadow:0 0 20px #66aaff; }
   .subtitle { text-align:center; color:#88bbff; margin-bottom:15px; }
 
@@ -42,17 +48,20 @@
   }
   .buy-btn:hover:not(:disabled) { background:#3388ee; }
 
-  .floating-text { position:absolute; color:#aaffff; font-weight:bold; pointer-events:none; text-shadow:0 0 10px #66aaff; animation:floatUp 0.9s ease-out forwards; }
+  .floating-text { 
+    position:absolute; color:#aaffff; font-weight:bold; pointer-events:none; 
+    text-shadow:0 0 10px #66aaff; animation:floatUp 0.9s ease-out forwards; 
+  }
   @keyframes floatUp { to { transform:translateY(-90px); opacity:0; } }
 
-  /* 降る星エフェクト */
+  /* 常時降る星 */
   .star-particle {
-    position: fixed; font-size: 1.5rem; pointer-events: none; z-index: 9999;
-    animation: fall linear forwards;
-    text-shadow: 0 0 12px #88eeff;
+    position: fixed; font-size: 1.4rem; pointer-events: none; z-index: 5;
+    animation: fall linear forwards; text-shadow: 0 0 8px #88eeff;
+    opacity: 0.7;
   }
   @keyframes fall {
-    to { transform: translateY(120vh) rotate(360deg); opacity: 0; }
+    to { transform: translateY(120vh) rotate(720deg); opacity: 0; }
   }
 </style>
 </head>
@@ -131,7 +140,7 @@ let game = { stars: 0, lastSaved: Date.now(), buildings: {
 let lastUpdate = Date.now();
 let currentMultiplier = 1;
 
-// ==================== フォーマット ====================
+// ==================== ヘルパー ====================
 function formatNumber(num) {
   if (num < 1000) return num < 10 ? num.toFixed(2) : Math.floor(num).toString();
   const suffixes = ['K','M','B','T','Qa','Qi','Sx','Sp','Oc','No','Dc'];
@@ -162,7 +171,7 @@ function updateDisplay() {
     const id = el.dataset.id;
     const b = game.buildings[id];
     if (!b) return;
-    const count = currentMultiplier === 'max' ? 1 : currentMultiplier; // MAXは簡易表示
+    const count = currentMultiplier === 'max' ? 1 : currentMultiplier;
     el.querySelector('.cost').textContent = formatNumber(getCost(id, count));
     el.querySelector('.owned').textContent = b.owned;
   });
@@ -176,7 +185,6 @@ function clickCosmos(e) {
   createFloating(e, '+' + game.clickPower);
 }
 
-// ==================== 浮かぶ数字 ====================
 function createFloating(e, text) {
   const rect = e.currentTarget.getBoundingClientRect();
   const x = e.clientX - rect.left;
@@ -189,29 +197,47 @@ function createFloating(e, text) {
   setTimeout(() => div.remove(), 900);
 }
 
-// ==================== 降る星エフェクト ====================
-function createFallingStars(count, color = '#88eeff', size = '1.6rem') {
+// ==================== 星の雨 ====================
+function createFallingStar() {
+  const star = document.createElement('div');
+  star.className = 'star-particle';
+  star.textContent = '☆';
+  star.style.left = Math.random() * 100 + 'vw';
+  star.style.top = '-30px';
+  star.style.animationDuration = (3 + Math.random() * 4) + 's';
+  star.style.opacity = 0.4 + Math.random() * 0.6;
+  document.body.appendChild(star);
+  setTimeout(() => star.remove(), 8000);
+}
+
+// 常時優しい雨（1秒に1〜2個）
+setInterval(() => {
+  createFallingStar();
+  if (Math.random() > 0.5) createFallingStar();
+}, 800);
+
+// ==================== 初回購入大爆発 ====================
+function triggerFirstPurchaseEffect(id) {
+  let count = 40, color = '#88eeff', size = '1.6rem';
+  if (id === 'planet') { count = 35; color = '#88eeff'; }
+  else if (id === 'star') { count = 70; color = '#ffee88'; }
+  else if (id === 'galaxy') { count = 110; color = '#bb99ff'; }
+  else if (id === 'blackhole') { count = 160; color = '#ff88cc'; size = '2.2rem'; }
+
   for (let i = 0; i < count; i++) {
     setTimeout(() => {
       const star = document.createElement('div');
       star.className = 'star-particle';
-      star.textContent = '✨';
+      star.textContent = '☆';
       star.style.left = Math.random() * 100 + 'vw';
       star.style.top = '-50px';
       star.style.fontSize = size;
       star.style.color = color;
-      star.style.animationDuration = (2 + Math.random() * 3) + 's';
+      star.style.animationDuration = (1.5 + Math.random() * 2.5) + 's';
       document.body.appendChild(star);
-      setTimeout(() => star.remove(), 6000);
-    }, i * 15);
+      setTimeout(() => star.remove(), 7000);
+    }, i * 8);
   }
-}
-
-// ==================== 倍率 ====================
-function setMultiplier(multi) {
-  currentMultiplier = multi;
-  document.querySelectorAll('.multi-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.multi == multi));
-  updateDisplay(); // コスト更新
 }
 
 // ==================== 購入 ====================
@@ -233,25 +259,12 @@ function buyBuilding(id) {
     game.stars -= totalCost;
     game.buildings[id].owned += count;
 
-    // 初回購入エフェクト
     if (wasOwned === 0 && game.buildings[id].owned > 0) {
       triggerFirstPurchaseEffect(id);
     }
 
     updateDisplay();
     saveGame();
-  }
-}
-
-function triggerFirstPurchaseEffect(id) {
-  if (id === 'planet') {
-    createFallingStars(25, '#88eeff', '1.4rem'); // 水色ネオン
-  } else if (id === 'star') {
-    createFallingStars(50, '#ffee88');
-  } else if (id === 'galaxy') {
-    createFallingStars(80, '#bb99ff');
-  } else if (id === 'blackhole') {
-    createFallingStars(120, '#ff88cc', '2rem');
   }
 }
 
