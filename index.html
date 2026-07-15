@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grok Clicker 🌌</title>
+<style>
+  body {
+    margin: 0;
+    padding: 0;
+    background: radial-gradient(circle at center, #0f1a3d 0%, #000011 100%);
+    color: #cceeff;
+    font-family: system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+  }
+  .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+  h1 { text-align: center; font-size: 2.2rem; margin: 10px 0; text-shadow: 0 0 20px #66aaff; }
+  .subtitle { text-align: center; color: #88bbff; margin-bottom: 20px; }
+
+  #click-area {
+    width: 100%;
+    max-width: 380px;
+    height: 260px;
+    margin: 0 auto 25px;
+    background: radial-gradient(circle at 50% 35%, #445577, #112244, #000011);
+    border: 6px solid #66aaff;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 4.5rem;
+    box-shadow: 0 0 60px #4488ff, inset 0 0 80px rgba(255,255,255,0.15);
+    cursor: pointer;
+    user-select: none;
+    position: relative;
+    transition: transform 0.1s ease;
+  }
+  #click-area:active { transform: scale(0.92); }
+
+  .stats {
+    background: rgba(20, 40, 80, 0.6);
+    border: 2px solid #4488ff;
+    border-radius: 16px;
+    padding: 20px;
+    text-align: center;
+    margin-bottom: 25px;
+  }
+  .stars { font-size: 3rem; font-weight: bold; color: #aaddff; }
+  .per-sec { font-size: 1.3rem; color: #88ccff; }
+
+  .shop { margin-top: 10px; }
+  .building {
+    background: rgba(15, 30, 70, 0.85);
+    border: 2px solid #4488ff;
+    border-radius: 14px;
+    padding: 16px;
+    margin-bottom: 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+  }
+  .building-info { flex: 1; }
+  .building-name { font-size: 1.25rem; font-weight: bold; }
+  .building-stats { font-size: 0.95rem; color: #99bbdd; margin-top: 4px; }
+  .buy-btn {
+    background: #2266cc;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 9999px;
+    font-size: 1rem;
+    font-weight: bold;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .buy-btn:hover { background: #3388ee; }
+  .buy-btn:disabled { background: #334466; cursor: not-allowed; }
+
+  .floating-text {
+    position: absolute;
+    color: #aaffff;
+    font-weight: bold;
+    pointer-events: none;
+    text-shadow: 0 0 8px #66aaff;
+    animation: floatUp 0.9s ease-out forwards;
+  }
+  @keyframes floatUp {
+    to { transform: translateY(-90px); opacity: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🌌 Grok Clicker</h1>
+  <p class="subtitle">宇宙をクリックして支配せよ</p>
+
+  <!-- クリックエリア -->
+  <div id="click-area" onclick="clickCosmos(event)">
+    <div style="text-align:center; line-height:1;">
+      <div style="font-size:5rem;">✨</div>
+      <div style="font-size:1.1rem; margin-top:-10px;">クリックで星を生成</div>
+    </div>
+  </div>
+
+  <!-- ステータス -->
+  <div class="stats">
+    <div>所持している星</div>
+    <div id="star-count" class="stars">0</div>
+    <div id="star-per-sec" class="per-sec">0 /秒</div>
+  </div>
+
+  <!-- ショップ -->
+  <div class="shop">
+    <h2 style="margin: 10px 0 15px; text-align:center;">🛒 宇宙建造物</h2>
+
+    <div class="building" data-id="glitter">
+      <div class="building-info">
+        <div class="building-name">✨ 煌星</div>
+        <div class="building-stats">
+          所持: <span class="owned">0</span><br>
+          コスト: <span class="cost">10</span> 星<br>
+          生産: <span class="prod">0.1</span> /秒
+        </div>
+      </div>
+      <button class="buy-btn" onclick="buyBuilding('glitter')">購入</button>
+    </div>
+
+    <div class="building" data-id="galaxy">
+      <div class="building-info">
+        <div class="building-name">🌌 銀河</div>
+        <div class="building-stats">
+          所持: <span class="owned">0</span><br>
+          コスト: <span class="cost">100</span> 星<br>
+          生産: <span class="prod">1</span> /秒
+        </div>
+      </div>
+      <button class="buy-btn" onclick="buyBuilding('galaxy')">購入</button>
+    </div>
+
+    <div class="building" data-id="blackhole">
+      <div class="building-info">
+        <div class="building-name">🕳️ ブラックホール</div>
+        <div class="building-stats">
+          所持: <span class="owned">0</span><br>
+          コスト: <span class="cost">1,000</span> 星<br>
+          生産: <span class="prod">8</span> /秒
+        </div>
+      </div>
+      <button class="buy-btn" onclick="buyBuilding('blackhole')">購入</button>
+    </div>
+  </div>
+
+  <div style="text-align:center; margin-top:30px; font-size:0.85rem; opacity:0.6;">
+    進捗は自動保存されます<br>
+    タブを閉じても次回にオフライン分が反映されるよ
+  </div>
+</div>
+
+<script>
+// ==================== ゲームデータ ====================
+let game = {
+  stars: 0,
+  lastSaved: Date.now(),
+  buildings: {
+    glitter:   { owned: 0, baseCost: 10,   costMult: 1.15, baseProd: 0.1 },
+    galaxy:    { owned: 0, baseCost: 100,  costMult: 1.15, baseProd: 1 },
+    blackhole: { owned: 0, baseCost: 1000, costMult: 1.15, baseProd: 8 }
+  },
+  clickPower: 1
+};
+
+let lastUpdate = Date.now();
+
+// ==================== 数値フォーマット ====================
+function formatNumber(num) {
+  if (num < 1000) {
+    return num < 10 ? num.toFixed(2) : Math.floor(num).toString();
+  }
+  const suffixes = ['K','M','B','T','Qa','Qi','Sx','Sp','Oc','No','Dc'];
+  let tier = 0;
+  let n = num;
+  while (n >= 1000 && tier < suffixes.length - 1) {
+    n /= 1000;
+    tier++;
+  }
+  return n.toFixed(2) + suffixes[tier];
+}
+
+// ==================== 生産量計算 ====================
+function getTotalProduction() {
+  let total = 0;
+  for (let key in game.buildings) {
+    const b = game.buildings[key];
+    total += b.owned * b.baseProd;
+  }
+  return total;
+}
+
+// ==================== コスト計算 ====================
+function getCost(id) {
+  const b = game.buildings[id];
+  return Math.floor(b.baseCost * Math.pow(b.costMult, b.owned));
+}
+
+// ==================== 表示更新 ====================
+function updateDisplay() {
+  // 星の数
+  document.getElementById('star-count').textContent = formatNumber(game.stars);
+
+  // 1秒あたりの生産
+  const prod = getTotalProduction();
+  document.getElementById('star-per-sec').textContent = formatNumber(prod) + ' /秒';
+
+  // 各建物の表示更新
+  document.querySelectorAll('.building').forEach(el => {
+    const id = el.dataset.id;
+    const b = game.buildings[id];
+    if (!b) return;
+
+    el.querySelector('.owned').textContent = b.owned;
+    el.querySelector('.cost').textContent = formatNumber(getCost(id));
+    el.querySelector('.prod').textContent = b.baseProd;
+  });
+}
+
+// ==================== クリック処理 ====================
+function clickCosmos(e) {
+  game.stars += game.clickPower;
+  updateDisplay();
+  saveGame();
+
+  // 浮かぶ +1 エフェクト
+  const rect = e.currentTarget.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+
+  const text = document.createElement('div');
+  text.className = 'floating-text';
+  text.textContent = '+' + game.clickPower;
+  text.style.left = x + 'px';
+  text.style.top = y + 'px';
+  e.currentTarget.appendChild(text);
+
+  setTimeout(() => {
+    if (text.parentNode) text.parentNode.removeChild(text);
+  }, 900);
+}
+
+// ==================== 建物購入 ====================
+function buyBuilding(id) {
+  const cost = getCost(id);
+  if (game.stars >= cost) {
+    game.stars -= cost;
+    game.buildings[id].owned++;
+    updateDisplay();
+    saveGame();
+  }
+}
+
+// ==================== ゲームループ（自動生産 + オフライン対応） ====================
+function gameLoop() {
+  const now = Date.now();
+  const delta = (now - lastUpdate) / 1000;
+
+  const prod = getTotalProduction();
+  game.stars += prod * delta;
+
+  lastUpdate = now;
+  updateDisplay();
+
+  // 5秒ごとに自動保存
+  if (Math.floor(now / 5000) !== Math.floor(game.lastSaved / 5000)) {
+    saveGame();
+  }
+
+  requestAnimationFrame(gameLoop);
+}
+
+// ==================== 保存 ====================
+function saveGame() {
+  game.lastSaved = Date.now();
+  const saveData = {
+    stars: game.stars,
+    lastSaved: game.lastSaved,
+    buildings: game.buildings
+  };
+  localStorage.setItem('grokClicker', JSON.stringify(saveData));
+}
+
+// ==================== 読み込み ====================
+function loadGame() {
+  const saved = localStorage.getItem('grokClicker');
+  if (saved) {
+    const data = JSON.parse(saved);
+    game.stars = data.stars || 0;
+    game.lastSaved = data.lastSaved || Date.now();
+    if (data.buildings) {
+      for (let key in data.buildings) {
+        if (game.buildings[key]) {
+          game.buildings[key].owned = data.buildings[key].owned || 0;
+        }
+      }
+    }
+
+    // オフライン進行計算
+    const now = Date.now();
+    const offlineSeconds = (now - game.lastSaved) / 1000;
+    if (offlineSeconds > 0) {
+      const prod = getTotalProduction();
+      const offlineGain = prod * offlineSeconds;
+      game.stars += offlineGain;
+
+      // 通知（任意）
+      if (offlineGain > 10) {
+        setTimeout(() => {
+          alert(`オフラインで ${formatNumber(offlineGain)} 個の星を獲得しました！`);
+        }, 800);
+      }
+    }
+    lastUpdate = now;
+  } else {
+    lastUpdate = Date.now();
+  }
+  updateDisplay();
+}
+
+// ==================== 初期化 ====================
+function init() {
+  loadGame();
+  updateDisplay();
+  gameLoop();
+
+  // デバッグ用（コンソールで game.stars = 1000000 とかできる）
+  window.game = game;
+}
+
+init();
+</script>
+</body>
+</html>
