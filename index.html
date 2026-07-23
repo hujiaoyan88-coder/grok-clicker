@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Grok Clicker 🌌</title>
+<title>🌌 Grok Clicker 🌌</title>
 <style>
   body { 
     margin:0; padding:0; 
@@ -61,6 +61,15 @@
   }
   @keyframes fall {
     to { transform: translateY(120vh) rotate(720deg); opacity: 0; }
+  }
+
+  .ufo {
+    position: fixed;
+    z-index: 100;
+    pointer-events: none;
+    user-select: none;
+    text-shadow: 0 0 20px #aaffff, 0 0 40px #66ccff;
+    filter: drop-shadow(0 0 12px #88ffff);
   }
 </style>
 </head>
@@ -120,9 +129,12 @@
     </div>
   </div>
 
-  <div style="text-align:center; margin:25px 0;">
+  <div style="text-align:center; margin:25px 0; display:flex; justify-content:center; gap:12px; flex-wrap:wrap;">
     <button onclick="resetGame()" style="background:#cc3344; color:white; border:none; padding:10px 20px; border-radius:8px; cursor:pointer;">
-      🔄 リセット
+      🔄 完全リセット
+    </button>
+    <button id="retry-btn" onclick="spawnUFO()" style="display:none; background:#226644; color:white; border:none; padding:10px 20px; border-radius:8px; cursor:pointer; box-shadow:0 0 15px #44aa88;">
+      🛸 やり直し（プレステージ）
     </button>
   </div>
 </div>
@@ -139,7 +151,8 @@ let game = {
     blackhole: { owned: 0, baseCost: 10000,costMult: 1.15, baseProd: 80 }
   }, 
   clickPower: 1,
-  starRainLevel: 1  // 星の雨の強さ（初回購入で増加）
+  starRainLevel: 1,
+  prestigeCount: 0   // やり直し回数（将来用）
 };
 
 let lastUpdate = Date.now();
@@ -147,26 +160,14 @@ let currentMultiplier = 1;
 let rainInterval = null;
 
 // ==================== ヘルパー ====================
-// ==================== 数値フォーマット ====================
 function formatNumber(num) {
   if (!isFinite(num) || num <= 0) return '0';
-  
-  num = Math.floor(num); // 小数点以下切り捨て
-  
-  if (num < 10000) {
-    return num.toLocaleString('ja-JP');           // 1,234 のように表示
-  }
-  
-  if (num < 1000000) {
-    return (num / 1000).toFixed(1) + 'K';        // 12.3K
-  }
-  if (num < 1000000000) {
-    return (num / 1000000).toFixed(2) + 'M';     // 1.23M
-  }
-  
-  // それ以上は B 以降
+  num = Math.floor(num);
+  if (num < 10000) return num.toLocaleString('ja-JP');
+  if (num < 1000000) return (num / 1000).toFixed(1) + 'K';
+  if (num < 1000000000) return (num / 1000000).toFixed(2) + 'M';
   const suffixes = ['B', 'T', 'Qa', 'Qi', 'Sx', 'Sp', 'Oc', 'No', 'Dc'];
-  let tier = 2; // Bから
+  let tier = 2;
   let n = num / 1000000000;
   while (n >= 1000 && tier < suffixes.length + 1) {
     n /= 1000;
@@ -192,7 +193,6 @@ function getCost(id, count = 1) {
   return Math.floor(total);
 }
 
-// ==================== 表示 ====================
 function updateDisplay() {
   document.getElementById('star-count').textContent = formatNumber(game.stars);
   document.getElementById('star-per-sec').textContent = formatNumber(getTotalProduction()) + ' /秒';
@@ -205,6 +205,9 @@ function updateDisplay() {
     el.querySelector('.cost').textContent = formatNumber(getCost(id, count));
     el.querySelector('.owned').textContent = b.owned;
   });
+
+  const retryBtn = document.getElementById('retry-btn');
+  if (retryBtn) retryBtn.style.display = (game.buildings.blackhole.owned > 20) ? 'inline-block' : 'none';
 }
 
 // ==================== クリック ====================
@@ -228,7 +231,7 @@ function createFloating(e, text) {
 }
 
 // ==================== 星の雨 ====================
-function createFallingStar(intensity = 1) {
+function createFallingStar() {
   const star = document.createElement('div');
   star.className = 'star-particle';
   star.textContent = '☆';
@@ -243,47 +246,23 @@ function createFallingStar(intensity = 1) {
 
 function startStarRain() {
   if (rainInterval) clearInterval(rainInterval);
-  const intervalTime = Math.max(300, 1200 - game.starRainLevel * 150); // レベル上がるほど速く
+  const intervalTime = Math.max(300, 1200 - game.starRainLevel * 150);
   rainInterval = setInterval(() => {
     const num = 1 + Math.floor(game.starRainLevel / 2);
-    for (let i = 0; i < num; i++) {
-      createFallingStar();
-    }
+    for (let i = 0; i < num; i++) createFallingStar();
   }, intervalTime);
 }
 
-// ==================== 初回購入エフェクト ====================
+// 初回購入エフェクト（省略）
 function triggerFirstPurchaseEffect(id) {
-  game.starRainLevel = Math.min(8, game.starRainLevel + 1); // 最大8段階
+  game.starRainLevel = Math.min(8, game.starRainLevel + 1);
   startStarRain();
-
-  let count = 40, color = '#88eeff';
-  if (id === 'planet') count = 35;
-  else if (id === 'star') count = 70;
-  else if (id === 'galaxy') count = 110;
-  else if (id === 'blackhole') { count = 160; color = '#ff88cc'; }
-
-  for (let i = 0; i < count; i++) {
-    setTimeout(() => {
-      const star = document.createElement('div');
-      star.className = 'star-particle';
-      star.textContent = '☆';
-      star.style.left = Math.random() * 100 + 'vw';
-      star.style.top = '-50px';
-      star.style.fontSize = (id === 'blackhole' ? '2.2rem' : '1.6rem');
-      star.style.color = color;
-      star.style.animationDuration = (1.2 + Math.random() * 2) + 's';
-      document.body.appendChild(star);
-      setTimeout(() => star.remove(), 7000);
-    }, i * 6);
-  }
 }
 
 // ==================== 購入 ====================
 function buyBuilding(id) {
   const wasOwned = game.buildings[id].owned;
   let count = currentMultiplier === 'max' ? 999999 : currentMultiplier;
-
   if (currentMultiplier === 'max') {
     let maxBuy = 0; let temp = game.stars;
     let curCost = game.buildings[id].baseCost * Math.pow(game.buildings[id].costMult, wasOwned);
@@ -294,26 +273,84 @@ function buyBuilding(id) {
     }
     count = maxBuy || 1;
   }
-
   const totalCost = getCost(id, count);
   if (game.stars >= totalCost && count > 0) {
     game.stars -= totalCost;
     game.buildings[id].owned += count;
-
-    if (wasOwned === 0 && game.buildings[id].owned > 0) {
-      triggerFirstPurchaseEffect(id);
-    }
-
+    if (wasOwned === 0 && game.buildings[id].owned > 0) triggerFirstPurchaseEffect(id);
     updateDisplay();
     saveGame();
   }
 }
 
-// ==================== 倍率 ====================
 function setMultiplier(multi) {
   currentMultiplier = multi;
   document.querySelectorAll('.multi-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.multi == multi));
   updateDisplay();
+}
+
+// ==================== 🛸 やり直し（プレステージ） ====================
+function spawnUFO() {
+  const bh = game.buildings.blackhole.owned;
+  if (bh <= 20) return;
+
+  // === リセット処理（星と建物所持数を0に） ===
+  game.stars = 0;
+  Object.keys(game.buildings).forEach(key => {
+    game.buildings[key].owned = 0;
+  });
+  // blackholeはやり直し時に0に戻す（UFOは残る）
+  
+  game.prestigeCount = (game.prestigeCount || 0) + 1;
+
+  updateDisplay();
+  saveGame();
+
+  // === 新しいUFO出現（速度を遅く） ===
+  let sizeRem = 2.8;
+  if (bh >= 100) sizeRem = 9.0;
+  else if (bh >= 90) sizeRem = 8.0;
+  else if (bh >= 80) sizeRem = 7.0;
+  else if (bh >= 70) sizeRem = 6.2;
+  else if (bh >= 60) sizeRem = 5.5;
+  else if (bh >= 50) sizeRem = 4.8;
+  else if (bh >= 40) sizeRem = 4.2;
+  else if (bh >= 30) sizeRem = 3.5;
+
+  const ufo = document.createElement('div');
+  ufo.className = 'ufo';
+  ufo.textContent = '🛸';
+  ufo.style.fontSize = sizeRem + 'rem';
+  ufo.style.left = (5 + Math.random() * 80) + 'vw';
+  ufo.style.top  = (5 + Math.random() * 80) + 'vh';
+  document.body.appendChild(ufo);
+
+  // 速度を大幅に遅く（前の3.8 → 1.6程度）
+  let vx = (Math.random() - 0.5) * 1.6;
+  let vy = (Math.random() - 0.5) * 1.6;
+
+  function move() {
+    if (!ufo.isConnected) return;
+    let x = parseFloat(ufo.style.left);
+    let y = parseFloat(ufo.style.top);
+
+    x += vx; y += vy;
+
+    if (x < 0) { x = 0; vx = Math.abs(vx) * 0.92; }
+    if (x > 88) { x = 88; vx = -Math.abs(vx) * 0.92; }
+    if (y < 0) { y = 0; vy = Math.abs(vy) * 0.92; }
+    if (y > 88) { y = 88; vy = -Math.abs(vy) * 0.92; }
+
+    if (Math.random() < 0.018) {
+      vx += (Math.random() - 0.5) * 1.2;
+      vy += (Math.random() - 0.5) * 1.2;
+    }
+
+    ufo.style.left = x + 'vw';
+    ufo.style.top  = y + 'vh';
+    requestAnimationFrame(move);
+  }
+  move();
 }
 
 // ==================== ループ・保存 ====================
@@ -328,16 +365,14 @@ function gameLoop() {
 
 function saveGame() {
   game.lastSaved = Date.now();
-  localStorage.setItem('grokClicker_v4', JSON.stringify(game));
+  localStorage.setItem('grokClicker_v5', JSON.stringify(game));  // v5に変更
 }
 
 function loadGame() {
-  const saved = localStorage.getItem('grokClicker_v4');
+  const saved = localStorage.getItem('grokClicker_v5');
   if (saved) {
     const data = JSON.parse(saved);
-    game.stars = data.stars || 0;
-    game.starRainLevel = data.starRainLevel || 1;
-    if (data.buildings) Object.assign(game.buildings, data.buildings);
+    Object.assign(game, data);
     const offline = (Date.now() - (data.lastSaved || Date.now())) / 1000;
     if (offline > 5) game.stars += getTotalProduction() * offline;
   }
@@ -346,8 +381,9 @@ function loadGame() {
 }
 
 function resetGame() {
-  if (confirm('全部リセットしますか？')) {
-    localStorage.removeItem('grokClicker_v4');
+  if (confirm('完全にリセットしますか？（UFOも星も建物も全部消えます）')) {
+    localStorage.removeItem('grokClicker_v5');
+    document.querySelectorAll('.ufo').forEach(u => u.remove());
     location.reload();
   }
 }
